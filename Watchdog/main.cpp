@@ -1,33 +1,26 @@
 #include <string>
 #include <windows.h>
+#include <stdexcept>
+#include "FilesWatchdog.h"
 #include <iostream>
-#include "AutoCloseHandle.h"
-#include "WinErrorThrower.h"
 
-HANDLE start_watchdog(std::wstring path)
-{
-	HANDLE changeNotification = FindFirstChangeNotification(path.c_str(), TRUE, FILE_NOTIFY_CHANGE_FILE_NAME);
-	return changeNotification;
-}
 
 int main()
 {
 	// Choose directory to check
 	std::wstring directory_path = L"C:\\temp\\ChangingDir";
 	// Start watchdog
-	AutoCloseHandle watchdog(start_watchdog(directory_path));
+	FilesWatchdog watchdog(directory_path, FILE_NOTIFY_CHANGE_FILE_NAME);
 
 	// Get notification
-	switch (WaitForSingleObject(watchdog.get(), INFINITE))
+	try 
 	{
-	case WAIT_OBJECT_0:
-		std::cout << "A change has occured!" << std::endl;
-		break;
-	case WAIT_TIMEOUT:
-	case WAIT_ABANDONED:
-	case WAIT_FAILED:
-		break;
+		watchdog.start();
 	}
-	// Deal with notification
+	catch (std::runtime_error e)
+	{
+		std::cout << e.what() << std::endl;
+	}
+
 	return 0;
 }

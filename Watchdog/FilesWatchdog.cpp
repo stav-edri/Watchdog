@@ -1,13 +1,23 @@
 #include "FilesWatchdog.h"
 #include <stdexcept>
 #include "WinErrorThrower.h"
+#include <iostream>
 
 void FilesWatchdog::start()
 {
 	_running = true;
-	for (auto& notification : _notifications)
+	for (auto& notification : _inactive_notifications)
 	{
-		_first_search(notification);
+		AutoCloseHandle new_handle(
+			_first_search(notification), 
+			FindCloseChangeNotification);
+
+		NotificationData data = {
+			std::move(notification),
+			std::move(new_handle)
+		};
+
+		_notifications.push_back(std::move(data));
 	}
 
 	// TODO: Make asynchronous
@@ -23,10 +33,10 @@ void FilesWatchdog::start()
 	}
 }
 
-void FilesWatchdog::_first_search(NotificationData &notification)
+HANDLE FilesWatchdog::_first_search(FileSearchData & notification)
 {
 	HANDLE changeNotification = FindFirstChangeNotification(
-		notification.data.path.c_str(), 
+		notification.path.c_str(), 
 		TRUE, 
 		FILE_NOTIFY_CHANGE_FILE_NAME);
 
@@ -34,8 +44,7 @@ void FilesWatchdog::_first_search(NotificationData &notification)
 	{
 		WinErrorThrower::throw_last_error(); // Runtime error
 	}
-
-	notification.handle.reset(&AutoCloseHandle(changeNotification, FindCloseChangeNotification));
+	return changeNotification;
 }
 
 void FilesWatchdog::_next_search(NotificationData& notification)
@@ -68,14 +77,17 @@ void FilesWatchdog::_listen_all_once()
 	case WAIT_IO_COMPLETION:
 	case WAIT_TIMEOUT:
 	case WAIT_FAILED:
-		break;
+		return;
 	}
 
 	// Wait result is abandoned
 	if (waitResult - WAIT_ABANDONED_0 > 0 && waitResult - WAIT_ABANDONED_0 < _notifications.size())
-	{}
+	{
+		return;
+	}
 
 	// For now do nothing. 
 	// TODO: In the future we will need to bring change information.
-	int object_index = waitResult - WAIT_OBJECT_0;
+	DWORD object_index = waitResult - WAIT_OBJECT_0;
+	std::wcout << L"Changed: " << _notifications[object_index].data.path << " with flags: " << _notifications[object_index].data.filters << std::endl;
 }

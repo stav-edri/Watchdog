@@ -16,26 +16,27 @@ class FilesWatchdog
 private:
 	struct NotificationData {
 		FileSearchData data;
-		std::unique_ptr<AutoCloseHandle> handle;
+		AutoCloseHandle handle;
 	};
 
 public:
-	FilesWatchdog(std::wstring path, DWORD filters)
+	FilesWatchdog(const std::wstring &path, const DWORD filters)
 	{
-		NotificationData notification;
-		notification.data.path	 = path;
-		notification.data.filters = filters;
+		FileSearchData search_data;
+		search_data.path	 = path;
+		search_data.filters = filters;
 
-		_notifications.push_back(std::move(notification));
+		_inactive_notifications.push_back(std::move(search_data));
 	}
-	FilesWatchdog(std::vector<FileSearchData> searches)
+	FilesWatchdog(const std::vector<FileSearchData> &searches)
 	{
-		for (auto search : searches)
+		for (const auto &search : searches)
 		{
-			NotificationData notification;
-			notification.data.path = search.path;
-			notification.data.filters = search.filters;
-			_notifications.push_back(std::move(notification));
+			FileSearchData search_data;
+			search_data.path = search.path;
+			search_data.filters = search.filters;
+
+			_inactive_notifications.push_back(std::move(search_data));
 		}
 	}
 	
@@ -43,12 +44,13 @@ public:
 	void stop();
 
 private:
-	void _first_search(NotificationData &notification);
+	HANDLE _first_search(FileSearchData & notification);
 	void _next_search(NotificationData &notification);
 	void _get_information(NotificationData &notification);
 	void _listen_all_once();
 
 private:
+	std::vector<FileSearchData> _inactive_notifications;
 	std::vector<NotificationData> _notifications;
 	// TODO: Thread safety
 	bool _running = false;
