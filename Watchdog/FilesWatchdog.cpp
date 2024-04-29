@@ -8,6 +8,8 @@ void FilesWatchdog::start()
 	_running = true;
 	for (auto& notification : _inactive_notifications)
 	{
+		std::lock_guard<std::mutex> lock(_notifications_mutex);
+
 		AutoCloseHandle new_handle(
 			_first_search(notification), 
 			FindCloseChangeNotification);
@@ -33,11 +35,16 @@ void FilesWatchdog::start()
 	}
 }
 
+void FilesWatchdog::stop()
+{
+	_running = false;
+}
+
 HANDLE FilesWatchdog::_first_search(FileSearchData & notification)
 {
 	HANDLE changeNotification = FindFirstChangeNotification(
 		notification.path.c_str(), 
-		TRUE, 
+		TRUE,	// TODO: Change to a variable
 		FILE_NOTIFY_CHANGE_FILE_NAME);
 
 	if (INVALID_HANDLE_VALUE == changeNotification)
@@ -67,8 +74,8 @@ void FilesWatchdog::_listen_all_once()
 	DWORD waitResult = WaitForMultipleObjectsEx(
 		static_cast<DWORD>(_notifications.size()), 
 		handles.data(), 
-		FALSE, 
-		5 * 1000, 
+		FALSE,
+		5 * 1000, // TODO: Change to a variable
 		TRUE);
 
 	// Wait result is non indexed

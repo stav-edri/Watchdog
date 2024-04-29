@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "AutoCloseHandle.h"
+#include <mutex>
 
 struct FileSearchData
 {
@@ -53,6 +54,8 @@ private:
 	std::vector<FileSearchData> _inactive_notifications;
 	std::vector<NotificationData> _notifications;
 	// TODO: Thread safety
-	bool _running = false;
+	std::atomic<bool> _running = false;
+	std::mutex _inactive_notifications_mutex;
+	std::mutex _notifications_mutex;
 };
 
