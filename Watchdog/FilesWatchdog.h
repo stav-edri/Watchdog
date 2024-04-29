@@ -45,7 +45,8 @@ public:
 	void stop();
 
 private:
-	HANDLE _first_search(FileSearchData & notification);
+	HANDLE _first_search(FileSearchData &notification);
+	void _init_searches();
 	void _next_search(NotificationData &notification);
 	void _get_information(NotificationData &notification);
 	void _listen_all_once();

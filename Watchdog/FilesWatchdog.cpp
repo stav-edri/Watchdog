@@ -6,33 +6,13 @@
 void FilesWatchdog::start()
 {
 	_running = true;
-	for (auto& notification : _inactive_notifications)
-	{
-		std::lock_guard<std::mutex> lock(_notifications_mutex);
+	// Setup active notifications with first search
+	_init_searches();
 
-		AutoCloseHandle new_handle(
-			_first_search(notification), 
-			FindCloseChangeNotification);
-
-		NotificationData data = {
-			std::move(notification),
-			std::move(new_handle)
-		};
-
-		_notifications.push_back(std::move(data));
-	}
-
-	// TODO: Make asynchronous
-	_listen_all_once();
-	while (_running)
-	{
-		for (auto& notification : _notifications)
-		{
-			_next_search(notification);
-		}
-		
+	do {
+		// TODO: Make asynchronous
 		_listen_all_once();
-	}
+	} while (_running);
 }
 
 void FilesWatchdog::stop()
@@ -40,7 +20,7 @@ void FilesWatchdog::stop()
 	_running = false;
 }
 
-HANDLE FilesWatchdog::_first_search(FileSearchData & notification)
+HANDLE FilesWatchdog::_first_search(FileSearchData& notification)
 {
 	HANDLE changeNotification = FindFirstChangeNotification(
 		notification.path.c_str(), 
@@ -54,12 +34,36 @@ HANDLE FilesWatchdog::_first_search(FileSearchData & notification)
 	return changeNotification;
 }
 
+void FilesWatchdog::_init_searches()
+{
+	for (auto& notification : _inactive_notifications)
+	{
+		std::lock_guard<std::mutex> lock(_notifications_mutex);
+
+		AutoCloseHandle new_handle(
+			_first_search(notification),
+			FindCloseChangeNotification);
+
+		NotificationData data = {
+			std::move(notification),
+			std::move(new_handle)
+		};
+
+		_notifications.push_back(std::move(data));
+	}
+}
+
 void FilesWatchdog::_next_search(NotificationData& notification)
 {
 	if (!FindNextChangeNotification(notification.handle.get()))
 	{
 		WinErrorThrower::throw_last_error();
 	}
+}
+
+void FilesWatchdog::_get_information(NotificationData& notification)
+{
+
 }
 
 void FilesWatchdog::_listen_all_once()
@@ -97,4 +101,7 @@ void FilesWatchdog::_listen_all_once()
 	// TODO: In the future we will need to bring change information.
 	DWORD object_index = waitResult - WAIT_OBJECT_0;
 	std::wcout << L"Changed: " << _notifications[object_index].data.path << " with flags: " << _notifications[object_index].data.filters << std::endl;
+
+	// Reset search for the returned notification
+	_next_search(_notifications[object_index]);
 }
